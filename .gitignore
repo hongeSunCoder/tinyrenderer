@@ -1,2 +1,4 @@
 build/
 framebuffer.tga
+.vscode
+.DS_Store
