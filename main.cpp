@@ -139,7 +139,10 @@ int main(int argc, char **argv)
     Vec2i t2 = Vec2i(80, 40);
     drawman.triangle(t0, t1, t2, framebuffer, grayColor);
 
-    drawman.triangle2(t0, t1, t2, framebuffer, redColor);
+    // drawman.triangle2(t0, t1, t2, framebuffer, redColor);
+
+    Vec2i pts[3] = {t0, t1, t2};
+    drawman.triangle(pts, framebuffer, redColor);
 
     bool success = framebuffer.write_tga_file("line.tga");
 
