@@ -1,8 +1,8 @@
 #ifndef __DRAW_H__
 #define __DRAW_H__
 
-#include "../tgaimage.h"
-#include "../lesson1/geometry.h"
+#include "../tgaimage/tgaimage.h"
+#include "../lesson3/geometry.h"
 
 class Draw
 {

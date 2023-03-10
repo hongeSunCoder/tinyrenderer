@@ -1,24 +1,22 @@
 #include <limits>
 #include <cmath>
 #include <vector>
-// #include "model.h"
-// #include "geometry/line.h"
 #include "geometry/draw.h"
 
-#include "tgaimage.h"
-#include "lesson1/geometry.h"
+#include "tgaimage/tgaimage.h"
+// #include "lesson1/geometry.h"
 #include "lesson1/model.h"
-#include "our_gl.h"
+// #include "our_gl.h"
 
 constexpr int width = 800; // output image size
 constexpr int height = 800;
-constexpr vec3 light_dir{1, 1, 1}; // light source
-constexpr vec3 eye{1, 1, 3};       // camera position
-constexpr vec3 center{0, 0, 0};    // camera direction
-constexpr vec3 up{0, 1, 0};        // camera up vector
+// constexpr vec3 light_dir{1, 1, 1}; // light source
+// constexpr vec3 eye{1, 1, 3};       // camera position
+// constexpr vec3 center{0, 0, 0};    // camera direction
+// constexpr vec3 up{0, 1, 0};        // camera up vector
 
-extern mat<4, 4> ModelView; // "OpenGL" state matrices
-extern mat<4, 4> Projection;
+// extern mat<4, 4> ModelView; // "OpenGL" state matrices
+// extern mat<4, 4> Projection;
 
 // struct Shader : IShader
 // {
@@ -177,17 +175,19 @@ int main(int argc, char **argv)
         ;
     for (int i = 0; i < model.nfaces(); i++)
     {
-        std::vector<int> face = model.face(i);
+        std::vector<std::vector<int>> face = model.face(i);
         Vec3f world_coords[3];
         Vec3f screen_coords[3];
 
         for (int j = 0; j < 3; j++)
         {
-            world_coords[j] = model.vert(face[j]);
-            screen_coords[j] = Vec3f((world_coords[j].x + 1) * width / 2, (world_coords[j].y + 1) * height / 2, world_coords[j].z);
+            world_coords[j] = model.vert(face[0][j]);
+
+            screen_coords[j] = Vec3f(int((world_coords[j].x + 1) * width / 2), int((world_coords[j].y + 1) * height / 2), world_coords[j].z);
         }
 
-        Vec3f n = (world_coords[2] - world_coords[0]) ^ (world_coords[1] - world_coords[0]);
+        Vec3f n = cross((world_coords[2] - world_coords[0]), (world_coords[1] - world_coords[0]));
+
         n.normalize();
 
         float intensity = n * light_dir;
@@ -195,6 +195,7 @@ int main(int argc, char **argv)
         {
 
             TGAColor randColor = {(std::uint8_t)(255 * intensity), (std::uint8_t)(255 * intensity), (std::uint8_t)(255 * intensity), 255};
+
             drawman.triangle(screen_coords, zbuffer, framebuffer, randColor);
         };
     }
