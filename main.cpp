@@ -95,8 +95,8 @@ extern mat<4, 4> Projection;
 
 int main(int argc, char **argv)
 {
-    int width = 100;
-    int height = 100;
+    int width = 800;
+    int height = 800;
     TGAImage framebuffer(width, height, TGAImage::RGB);
     TGAColor grayColor;
     grayColor[0] = 255;
@@ -109,11 +109,13 @@ int main(int argc, char **argv)
     redColor[2] = 255;
     redColor[3] = 100;
 
+    TGAColor randColor = {(std::uint8_t)(rand() % 255), (std::uint8_t)(rand() % 255), (std::uint8_t)(rand() % 255), 255};
+
     // line(10, 0, 50, 50, framebuffer, color);
 
     // line(13, 20, 80, 40, framebuffer, redColor);
 
-    // Model model(argv[1]);
+    Model model(argv[1]);
     // for (int i = 0; i < model.nfaces(); i++)
     // {
     //     std::vector<int> face = model.face(i);
@@ -137,12 +139,65 @@ int main(int argc, char **argv)
     Vec2i t0 = Vec2i(10, 90);
     Vec2i t1 = Vec2i(70, 10);
     Vec2i t2 = Vec2i(80, 40);
-    drawman.triangle(t0, t1, t2, framebuffer, grayColor);
 
     // drawman.triangle2(t0, t1, t2, framebuffer, redColor);
 
-    Vec2i pts[3] = {t0, t1, t2};
-    drawman.triangle(pts, framebuffer, redColor);
+    // Vec2i pts[3] = {t0, t1, t2};
+    // drawman.triangle(pts, framebuffer, redColor);
+    // drawman.triangle(t0, t1, t2, framebuffer, grayColor);
+
+    Vec3f light_dir(0, 0, -1); //
+    // for (int i = 0; i < model.nfaces(); i++)
+    // {
+    //     std::vector<int> face = model.face(i);
+    //     Vec2i screen_coords[3];
+    //     Vec3f world_coords[3];
+    //     for (int j = 0; j < 3; j++)
+    //     {
+    //         Vec3f v = model.vert(face[j]);
+    //         screen_coords[j] = Vec2i((v.x + 1) * width / 2, (v.y + 1) * height / 2);
+    //         world_coords[j] = v;
+    //     }
+
+    //     Vec3f n = (world_coords[2] - world_coords[0]) ^ (world_coords[1] - world_coords[0]);
+    //     n.normalize();
+
+    //     float intensity = n * light_dir;
+    //     if (intensity > 0)
+    //     {
+    //         Vec2i pts[3] = {screen_coords[0], screen_coords[1], screen_coords[2]};
+
+    //         TGAColor randColor = {(std::uint8_t)(rand() % 255 * intensity), (std::uint8_t)(rand() % 255 * intensity), (std::uint8_t)(rand() % 255 * intensity), 255};
+    //         drawman.triangle(pts, framebuffer, randColor);
+    //     };
+    // }
+
+    float zbuffer[width * height];
+    for (int i = width * height; i--; zbuffer[i] = -std::numeric_limits<float>::max())
+        ;
+    for (int i = 0; i < model.nfaces(); i++)
+    {
+        std::vector<int> face = model.face(i);
+        Vec3f world_coords[3];
+        Vec3f screen_coords[3];
+
+        for (int j = 0; j < 3; j++)
+        {
+            world_coords[j] = model.vert(face[j]);
+            screen_coords[j] = Vec3f((world_coords[j].x + 1) * width / 2, (world_coords[j].y + 1) * height / 2, world_coords[j].z);
+        }
+
+        Vec3f n = (world_coords[2] - world_coords[0]) ^ (world_coords[1] - world_coords[0]);
+        n.normalize();
+
+        float intensity = n * light_dir;
+        if (intensity > 0)
+        {
+
+            TGAColor randColor = {(std::uint8_t)(255 * intensity), (std::uint8_t)(255 * intensity), (std::uint8_t)(255 * intensity), 255};
+            drawman.triangle(screen_coords, zbuffer, framebuffer, randColor);
+        };
+    }
 
     bool success = framebuffer.write_tga_file("line.tga");
 
