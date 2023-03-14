@@ -17,7 +17,9 @@ public:
     ~Model();
     int nverts();
     int nfaces();
+    int ntextures();
     Vec3f vert(int i);
+    Vec2f texture(int i);
     std::vector<std::vector<int>> face(int idx);
 };
 

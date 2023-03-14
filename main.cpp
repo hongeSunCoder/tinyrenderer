@@ -10,6 +10,7 @@
 
 constexpr int width = 800; // output image size
 constexpr int height = 800;
+constexpr int depth = 255;
 // constexpr vec3 light_dir{1, 1, 1}; // light source
 // constexpr vec3 eye{1, 1, 3};       // camera position
 // constexpr vec3 center{0, 0, 0};    // camera direction
@@ -91,10 +92,52 @@ constexpr int height = 800;
 //     return 0;
 // }
 
+/*
+lesson 4: Perspective Projection
+
+Translation in 2D is not linear because
+[x y] + [e f]
+
+in 3D is linear:
+[0 0 e]
+[0 0 f] [x y 1] = [e f 1]
+[0 0 1]
+
+*/
+
+Matrix viewport(int x, int y, int w, int h)
+{
+    Matrix m = Matrix::identity();
+    m[0][3] = x + w / 2.f;
+    m[1][3] = y + h / 2.f;
+    m[2][3] = depth / 2.f;
+
+    m[0][0] = w / 2.f;
+    m[1][1] = h / 2.f;
+    m[2][2] = depth / 2.f;
+    return m;
+}
+
+Vec3f m2v(Matrix41 m)
+{
+    return Vec3f(int(m[0][0] / m[3][0]), int(m[1][0] / m[3][0]), int(m[2][0] / m[3][0]));
+}
+
+Matrix41 v2m(Vec3f v)
+{
+    Matrix41 m;
+
+    m[0][0] = v.x;
+    m[1][0] = v.y;
+    m[2][0] = v.z;
+    m[3][0] = 1.f;
+    return m;
+}
+
 int main(int argc, char **argv)
 {
-    int width = 800;
-    int height = 800;
+    int width = 1024;
+    int height = 1024;
     TGAImage framebuffer(width, height, TGAImage::RGB);
     TGAColor grayColor;
     grayColor[0] = 255;
@@ -144,46 +187,38 @@ int main(int argc, char **argv)
     // drawman.triangle(pts, framebuffer, redColor);
     // drawman.triangle(t0, t1, t2, framebuffer, grayColor);
 
-    Vec3f light_dir(0, 0, -1); //
-    // for (int i = 0; i < model.nfaces(); i++)
-    // {
-    //     std::vector<int> face = model.face(i);
-    //     Vec2i screen_coords[3];
-    //     Vec3f world_coords[3];
-    //     for (int j = 0; j < 3; j++)
-    //     {
-    //         Vec3f v = model.vert(face[j]);
-    //         screen_coords[j] = Vec2i((v.x + 1) * width / 2, (v.y + 1) * height / 2);
-    //         world_coords[j] = v;
-    //     }
+    Vec3f light_dir(0, 0, -1);
+    Vec3f camera(0, 0, 10);
 
-    //     Vec3f n = (world_coords[2] - world_coords[0]) ^ (world_coords[1] - world_coords[0]);
-    //     n.normalize();
-
-    //     float intensity = n * light_dir;
-    //     if (intensity > 0)
-    //     {
-    //         Vec2i pts[3] = {screen_coords[0], screen_coords[1], screen_coords[2]};
-
-    //         TGAColor randColor = {(std::uint8_t)(rand() % 255 * intensity), (std::uint8_t)(rand() % 255 * intensity), (std::uint8_t)(rand() % 255 * intensity), 255};
-    //         drawman.triangle(pts, framebuffer, randColor);
-    //     };
-    // }
+    TGAImage texture;
+    texture.read_tga_file(argv[2]);
+    texture.flip_vertically();
 
     float zbuffer[width * height];
     for (int i = width * height; i--; zbuffer[i] = -std::numeric_limits<float>::max())
         ;
+
+    Matrix Projection = Matrix::identity();
+    Matrix ViewPort = viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
+    Projection[3][2] = -1.f / camera.z;
+
     for (int i = 0; i < model.nfaces(); i++)
     {
         std::vector<std::vector<int>> face = model.face(i);
         Vec3f world_coords[3];
         Vec3f screen_coords[3];
+        Vec2f world_texture_coords[3];
+        Vec2f screen_texture_coords[3];
 
         for (int j = 0; j < 3; j++)
         {
             world_coords[j] = model.vert(face[0][j]);
+            world_texture_coords[j] = model.texture(face[1][j]);
 
-            screen_coords[j] = Vec3f(int((world_coords[j].x + 1) * width / 2), int((world_coords[j].y + 1) * height / 2), world_coords[j].z);
+            screen_coords[j] = m2v(ViewPort * Projection * v2m(world_coords[j]));
+            // screen_coords[j] = Vec3f(int((world_coords[j].x + 1) * width / 2), int((world_coords[j].y + 1) * height / 2), world_coords[j].z);
+
+            screen_texture_coords[j] = Vec2f(int(texture.width() * world_texture_coords[j].x), int(texture.height() * world_texture_coords[j].y));
         }
 
         Vec3f n = cross((world_coords[2] - world_coords[0]), (world_coords[1] - world_coords[0]));
@@ -196,7 +231,15 @@ int main(int argc, char **argv)
 
             TGAColor randColor = {(std::uint8_t)(255 * intensity), (std::uint8_t)(255 * intensity), (std::uint8_t)(255 * intensity), 255};
 
-            drawman.triangle(screen_coords, zbuffer, framebuffer, randColor);
+            // std::vector<TGAColor> colors;
+
+            // for (int j = 0; j < 3; j++)
+            // {
+            //     colors.push_back(texture.get(int(texture.width() * world_texture_coords[j].x), int(texture.height() * world_texture_coords[j].y)));
+            // }
+
+            // drawman.triangle(screen_coords, zbuffer, framebuffer, grayColor);
+            drawman.triangle(screen_coords, zbuffer, framebuffer, texture, screen_texture_coords);
         };
     }
 

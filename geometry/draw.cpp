@@ -1,6 +1,20 @@
 
 #include "draw.h"
 
+Vec3f barycentric(Vec3f A, Vec3f B, Vec3f C, Vec3f P)
+{
+    Vec3f s[2];
+    for (int i = 2; i--;)
+    {
+        s[i][0] = C[i] - A[i];
+        s[i][1] = B[i] - A[i];
+        s[i][2] = A[i] - P[i];
+    }
+    Vec3f u = cross(s[0], s[1]);
+    if (std::abs(u[2]) > 1e-2) // dont forget that u[2] is integer. If it is zero then triangle ABC is degenerate
+        return Vec3f(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
+    return Vec3f(-1, 1, 1); // in this case generate negative coordinates, it will be thrown away by the rasterizator
+}
 /** cross product of two vectors: a x b or a^b
  * c = axb,is orthogonal to both a and b. direction given by the right-hand rule.
  * magnitude = the area of the parallelogram that the vectors span.
@@ -10,21 +24,25 @@
 Vec3f barycentric(Vec2i *pts, Vec2i P)
 {
     // u(ABx) + v(ACx) = APx, u(ABx) + v(ACx) + PAx = 0, the same with y
-    // when u,v>0 & u+v=1, P is in ABC
+    // when u,v>0 & u+v <= 1, P is in ABC
     // [u, v, 1][ABx, ACx, PAx] = 0
     // [u, v, 1][ABy, ACy, PAy] = 0
     // [u, v, 1] is orthogonal to both [ABx, ACx, PAx] and [ABy, ACy, PAy]
     // so [u, v, 1] = their cross product
 
-    Vec3f u = cross(Vec3f(pts[2][0] - pts[0][0], pts[1][0] - pts[0][0], pts[0][0] - P[0]), Vec3f(pts[2][1] - pts[0][1], pts[1][1] - pts[0][1], pts[0][1] - P[1]));
+    //
+    Vec3f r = cross(Vec3f(pts[2][0] - pts[0][0], pts[1][0] - pts[0][0], pts[0][0] - P[0]), Vec3f(pts[2][1] - pts[0][1], pts[1][1] - pts[0][1], pts[0][1] - P[1]));
     // Vec3f u = Vec3f(pts[2][0] - pts[0][0], pts[1][0] - pts[0][0], pts[0][0] - P[0]) ^ Vec3f(pts[2][1] - pts[0][1], pts[1][1] - pts[0][1], pts[0][1] - P[1]);
 
     /* `pts` and `P` has integer value as coordinates
            so `abs(u[2])` < 1 means `u[2]` is 0, that means
            triangle is degenerate, in this case return something with negative coordinates */
-    if (std::abs(u.z) < 1)
+
+    // r.x/r.z < 0, r.y/r.z < 0 时，不在
+    // 1- (r.x/r.z + r.y/r.z) < 0 时，不在
+    if (std::abs(r.z) < 1)
         return Vec3f(-1, 1, 1);
-    return Vec3f(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
+    return Vec3f(1.f - (r.x + r.y) / r.z, r.y / r.z, r.x / r.z);
 }
 
 Vec3f barycentric(Vec3f *pts, Vec3f P)
@@ -42,24 +60,54 @@ Vec3f barycentric(Vec3f *pts, Vec3f P)
 
     if (std::abs(u[2]) > 1e-2) // dont forget that u[2] is integer. If it is zero then triangle ABC is degenerate
         return Vec3f(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
+    // return Vec3f(u.x / u.z, u.y / u.z, 1.f - (u.x + u.y) / u.z);
     return Vec3f(-1, 1, 1);
     // return Vec3f(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
 }
 
-Vec3f barycentric(Vec3f A, Vec3f B, Vec3f C, Vec3f P)
+void Draw::triangle(Vec3f *pts, float *zbuffer, TGAImage &image, TGAImage &texture, Vec2f *texture_pts)
 {
-    Vec3f s[2];
-    for (int i = 2; i--;)
+    Vec2f bboxmin(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+    Vec2f bboxmax(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
+
+    Vec2f clamp(image.width() - 1, image.height() - 1);
+
+    for (int i = 0; i < 3; i++)
     {
-        s[i][0] = C[i] - A[i];
-        s[i][1] = B[i] - A[i];
-        s[i][2] = A[i] - P[i];
+        for (int j = 0; j < 2; j++)
+        {
+            bboxmin[j] = std::max(0.f, std::min(pts[i][j], bboxmin[j]));
+            bboxmax[j] = std::min(clamp[j], std::max(pts[i][j], bboxmax[j]));
+        }
     }
-    Vec3f u = cross(s[0], s[1]);
-    if (std::abs(u[2]) > 1e-2) // dont forget that u[2] is integer. If it is zero then triangle ABC is degenerate
-        return Vec3f(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
-    return Vec3f(-1, 1, 1); // in this case generate negative coordinates, it will be thrown away by the rasterizator
+
+    Vec3f P;
+    for (P.x = bboxmin.x; P.x <= bboxmax.x; P.x++)
+    {
+        for (P.y = bboxmin.y; P.y <= bboxmax.y; P.y++)
+        {
+            Vec3f bc_screen = barycentric(pts, P);
+            if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
+                continue;
+
+            P.z = 0;
+            for (int i = 0; i < 3; i++)
+                P.z += pts[i][2] * bc_screen[i];
+
+            int zindex = int(P.x + P.y * image.width());
+            if (zbuffer[zindex] < P.z)
+            {
+                zbuffer[zindex] = P.z;
+
+                Vec2f _t_p = texture_pts[0] + (texture_pts[2] - texture_pts[0]) * bc_screen.z + (texture_pts[1] - texture_pts[0]) * bc_screen.y;
+
+                TGAColor color = texture.get(int(_t_p.x), int(_t_p.y));
+                image.set(P.x, P.y, color);
+            }
+        }
+    }
 }
+
 // fill triangle with zbuffer
 void Draw::triangle(Vec3f *pts, float *zbuffer, TGAImage &image, TGAColor color)
 {
@@ -95,6 +143,10 @@ void Draw::triangle(Vec3f *pts, float *zbuffer, TGAImage &image, TGAColor color)
             if (zbuffer[zindex] < P.z)
             {
                 zbuffer[zindex] = P.z;
+
+                int x_ = P.x - pts[0].x;
+                int y_ = P.y - pts[0].y;
+
                 image.set(P.x, P.y, color);
             }
         }
