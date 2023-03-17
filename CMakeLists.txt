@@ -15,7 +15,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-file(GLOB SOURCES main.cpp */*.h */*.cpp)
+file(GLOB SOURCES lesson6/main.cpp */*.h */*.cpp)
 
 
 add_executable(${PROJECT_NAME} ${SOURCES})
